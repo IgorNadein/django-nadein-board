@@ -1,0 +1,12 @@
+.venv/
+node_modules/
+__pycache__/
+*.pyc
+*.sqlite3
+media/
+.env
+*.egg-info/
+dist/
+build/
+.playwright-cli/
+output/
