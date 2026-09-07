@@ -116,7 +116,7 @@ function TaskAddMenuPopover({
   );
 }
 
-function TaskAnchoredMenuPopover({
+export function TaskAnchoredMenuPopover({
   anchorRef,
   menuRef,
   menuWidth = 176,

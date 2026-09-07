@@ -3,12 +3,22 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework.routers import DefaultRouter
-from .api import BoardViewSet, ColumnViewSet, RowViewSet, LabelViewSet, TaskViewSet
+from .api import (
+    BoardViewSet,
+    ColumnViewSet,
+    RowViewSet,
+    LabelViewSet,
+    TaskViewSet,
+    GroupViewSet,
+)
+from .automation.api import AutomationViewSet
 
 app_name = "nadein_board"
 router = DefaultRouter()
 for name, view in [
     ("boards", BoardViewSet),
+    ("groups", GroupViewSet),
+    ("automations", AutomationViewSet),
     ("columns", ColumnViewSet),
     ("rows", RowViewSet),
     ("labels", LabelViewSet),

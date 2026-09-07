@@ -9,7 +9,7 @@ import {
   type CSSProperties,
 } from "react";
 import { flushSync } from "react-dom";
-import { useDraggable } from "@dnd-kit/core";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import {
   ChevronDown,
   Loader2,
@@ -130,6 +130,7 @@ function getTaskDueDateBadgeClass(task: TaskCard, defaultClass = "app-badge") {
 }
 
 type TaskCardViewProps = {
+  isOverlay?: boolean;
   task: TaskCard;
   onOpen: (task: TaskCard, target?: TaskViewTarget) => void;
   onEdit: (task: TaskCard) => void;
@@ -411,6 +412,16 @@ function TaskCardDraggableBinding({
 export const TaskCardView = memo(function TaskCardView(
   props: TaskCardViewProps,
 ) {
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: `${props.isOverlay ? "overlay" : "card"}-target-${props.task.id}`,
+    disabled: props.isOverlay,
+    data: {
+      acceptsTasks: true,
+      columnId: props.task.column,
+      rowId: props.task.row,
+      before: props.task.id,
+    },
+  });
   const [dragArmed, setDragArmed] = useState(false);
   const [dragBinding, setDragBinding] = useState<TaskCardDragBinding | null>(
     null,
@@ -436,6 +447,13 @@ export const TaskCardView = memo(function TaskCardView(
         key={`task-card-content-${props.task.id}`}
         {...props}
         {...(dragBinding || {})}
+        setNodeRef={(node) => {
+          setDropRef(node);
+          dragBinding?.setNodeRef?.(node);
+        }}
+        style={
+          isOver ? { borderTop: "3px solid var(--accent-primary)" } : undefined
+        }
         onPointerEnter={() => {
           pointerInsideRef.current = true;
           setDragArmed(true);

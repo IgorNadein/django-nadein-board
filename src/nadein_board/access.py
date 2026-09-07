@@ -18,3 +18,7 @@ def accessible_boards(user):
         | Q(members=user, access_scope="restricted")
         | Q(access_scope="all")
     ).distinct()
+
+
+def user_can_access_task_board(user, board):
+    return accessible_boards(user).filter(pk=board.pk, is_archived=False).exists()

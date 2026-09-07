@@ -1,25 +1,26 @@
-# Extraction record — 2026-09-08
+# Extraction boundaries — 0.2.0
 
-Source: IgorNadein/EUSRR, commit `096807f35670241c4f2ba422e2f1c189c1ec1742`.
+Source: IgorNadein/EUSRR at `096807f35670241c4f2ba422e2f1c189c1ec1742`. The original repository is unchanged.
 
-Retained and adapted:
+## Retained and adapted source
 
-- `backend/tasks/models.py`: TaskPriority, TaskBoardAccessScope, TaskBoard, TaskColumn, TaskColumnRow, TaskLabel, Task, TaskChecklistItem, TaskAttachment. New initial migration; prefixed user reverse relations/constraints; board-scoped labels; default private access.
-- `frontend/src/app/tasks/page.tsx`: task card components, drag binding, description and urgency/deadline presentation.
-- `frontend/src/lib/tasks/boardLayout.ts`, `columns.ts` and original board-layout tests.
+- Task/board/column/lane/label/checklist/attachment models and layout helpers.
+- Original `TaskCardContent`, lazy drag bindings, `QuickTaskComposer`, `BoardColumn`, `BoardSubcolumnHeader`, `BoardTaskCell`, `BoardColumnGroup`, `BoardColumnRowView`, `BoardBaseColumnsView` and `AddColumnCard` from the tasks page.
+- `useTaskBoardScroll`, board sticky/scroll CSS, anchored menus, `TaskCoverPreview`, `TaskBoardAvatar` and `AvatarCropper`.
+- `TaskAutomationManager`, automation types, schema, condition evaluation, action engine, activity-trigger mapping, schedule dispatch and idempotent run log.
+- Original activity and external-link models adapted to Django users and the independent task comment model.
 
-New standalone boundaries:
+## Standalone adaptations
 
-- `nadein_board.api` replaces the corporate API layer and enforces board access and cross-board relationship validation.
-- Board comments have their own TaskComment model rather than communications.Message.
-- A standalone React workspace/editor uses the extracted cards/layout; the original 14,000-line portal page is not copied wholesale.
-- Bundled frontend is delivered by Django staticfiles; no separate Next.js deployment.
-- Board access uses Django users and an optional host filter, without departments, employee roles, skills or staff services.
+- Workspace navigation provides personal groups, favourites, sorting and archive. It reproduces useful navigation mechanics without importing the corporate portal navigator and its transitive project/request/staff dependencies.
+- The task editor is a standalone composition with description, files, checklist, comments, links, participants, properties and history. Resources save after an action; editable properties have an explicit Save button and unsaved-change protection.
+- Comments use `TaskComment`; auth uses `AUTH_USER_MODEL`. Next Image, corporate media endpoints, corporate notifications and realtime calls are replaced with same-origin protected media and the `activity_committed` Django signal.
+- Automation rules are owned by their author. Even “all my boards” rules only act on boards the author currently manages and can access. Board-scoped labels cannot leak across boards. Inactive users and archived tasks/boards cannot run automations.
+- Event automations execute after transaction commit. Scheduled rules are dispatched by a management command; no Celery/Redis dependency is introduced.
+- The workspace polls every 20 seconds while idle, pauses during editing, and preserves unsaved field drafts.
 
-Not included in 0.1.0: corporate object links (documents, procurement, attendance, feed, calendar), employee skills/rewards, automation engine, notification integrations, realtime push, board grouping/pinning, full activity history, original portal-shell navigation. They have not been replaced with fake successful API responses.
+## Outside this package
 
-Source EUSRR files, Git history, database, uploaded files, configuration and credentials were not copied into this repository. EUSRR itself was not modified. Only selected source code and synthetic demo content are included.
+Corporate object links (documents, procurement, attendance, feed, calendar), employee skills/rewards, messenger links, unread counts and WebSocket push are host integration concerns. These have not been replaced with fake successful API responses. Card copies intentionally omit files, conversations and history; checklist progress resets. Cross-board card transfer is not implemented. Column archival is API-only. UI text is Russian.
 
-Validation is documented in README and tests. This is an initial independent core release, not a claim of complete feature parity or production certification.
-
-Additional original frontend retained after review: `useTaskBoardScroll`, `QuickTaskComposer`, `BoardColumn`, `BoardSubcolumnHeader`, `BoardTaskCell`, `BoardColumnGroup`, `BoardColumnRowView`, `BoardBaseColumnsView`, `AddColumnCard`, board-specific scrolling/sticky-header CSS, `TaskCoverPreview`, `TaskBoardAvatar` and `AvatarCropper`. New host adapters replace Next Image, corporate media APIs and the shared portal modal. Card cover types supported here are attachments, checklists and independent comments; corporate linked-object covers are not included.
+Only selected source and synthetic demo content are included. EUSRR Git history, database, uploaded files, deployment configuration and credentials were not copied. Public visibility does not itself grant an open-source license.

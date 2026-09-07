@@ -1,8 +1,8 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { ImagePlus, Trash2, X } from "lucide-react";
 import TaskBoardAvatar from "./TaskBoardAvatar";
 import AvatarCropper from "./AvatarCropper";
-import type { Board } from "./types";
+import type { Board, User } from "./types";
 export default function BoardEditor({
   board,
   api,
@@ -26,6 +26,22 @@ export default function BoardEditor({
     [preview, setPreview] = useState<string | null>(null),
     [removed, setRemoved] = useState(false),
     [created, setCreated] = useState<number | null>(board?.id || null);
+  const [people, setPeople] = useState<User[]>([]),
+    [memberQuery, setMemberQuery] = useState("");
+  useEffect(() => {
+    let active = true;
+    const timer = setTimeout(() => {
+      api<User[]>(`boards/people/?q=${encodeURIComponent(memberQuery)}`)
+        .then((users) => {
+          if (active) setPeople(users);
+        })
+        .catch(() => {});
+    }, 200);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [api, memberQuery]);
   async function submit(e: FormEvent) {
     e.preventDefault();
     await run(async () => {
@@ -37,7 +53,20 @@ export default function BoardEditor({
       let result = await api<Board>(
         created ? `boards/${created}/` : "boards/",
         created ? "PATCH" : "POST",
-        { name, description, access_scope: access, members: ids },
+        {
+          name,
+          description,
+          access_scope: access,
+          members: ids,
+          ...(board
+            ? {
+                is_archived:
+                  new FormData(e.currentTarget as HTMLFormElement).get(
+                    "is_archived",
+                  ) === "on",
+              }
+            : {}),
+        },
       );
       setCreated(result.id);
       if (preview) {
@@ -153,13 +182,52 @@ export default function BoardEditor({
             </div>
           </div>
           {access === "restricted" && (
-            <label>
-              ID участников Django через запятую
+            <fieldset>
+              <legend>Участники доски</legend>
               <input
-                value={members}
-                onChange={(e) => setMembers(e.target.value)}
-                placeholder="2, 3"
+                value={memberQuery}
+                onChange={(e) => setMemberQuery(e.target.value)}
+                placeholder="Поиск по логину"
+                aria-label="Найти участника"
               />
+              <div className="people-picker">
+                {people.map((u) => {
+                  const ids = members
+                    .split(",")
+                    .map((x) => Number(x.trim()))
+                    .filter(Boolean);
+                  return (
+                    <label className="choice-row" key={u.id}>
+                      <input
+                        type="checkbox"
+                        checked={ids.includes(u.id)}
+                        onChange={() =>
+                          setMembers(
+                            (ids.includes(u.id)
+                              ? ids.filter((id) => id !== u.id)
+                              : [...ids, u.id]
+                            ).join(", "),
+                          )
+                        }
+                      />
+                      {u.name}
+                    </label>
+                  );
+                })}
+              </div>
+              <small className="muted">
+                Выбрано: {members.split(",").filter((x) => x.trim()).length}
+              </small>
+            </fieldset>
+          )}
+          {board && (
+            <label className="choice-row">
+              <input
+                type="checkbox"
+                name="is_archived"
+                defaultChecked={board.is_archived}
+              />
+              Убрать доску в архив
             </label>
           )}
           <div className="flex justify-end gap-2">

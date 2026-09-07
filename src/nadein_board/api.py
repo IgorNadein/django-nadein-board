@@ -11,6 +11,8 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from .access import accessible_boards
+from .events import record
+from .automation.engine import _task_snapshot
 from .models import (
     TaskBoard,
     TaskColumn,
@@ -21,6 +23,9 @@ from .models import (
     TaskComment,
     TaskAttachment,
     TaskCover,
+    TaskExternalLink,
+    BoardGroup,
+    BoardPreference,
 )
 
 
@@ -40,6 +45,18 @@ def require_owner(user, board):
 
 
 class BoardSerializer(serializers.ModelSerializer):
+    is_pinned = serializers.SerializerMethodField()
+    can_manage = serializers.SerializerMethodField()
+
+    def get_is_pinned(self, obj):
+        return BoardPreference.objects.filter(
+            board=obj, user=self.context["request"].user, is_pinned=True
+        ).exists()
+
+    def get_can_manage(self, obj):
+        user = self.context["request"].user
+        return user.is_superuser or obj.created_by_id == user.pk
+
     avatar = serializers.SerializerMethodField()
 
     def get_avatar(self, obj):
@@ -52,6 +69,9 @@ class BoardSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "avatar",
+            "is_pinned",
+            "can_manage",
+            "updated_at",
             "name",
             "description",
             "created_by",
@@ -91,6 +111,12 @@ class ColumnSerializer(serializers.ModelSerializer):
             .exists()
         ):
             raise serializers.ValidationError("Board is not accessible.")
+        if (
+            self.instance
+            and self.instance.is_archived
+            and data.get("is_archived", True)
+        ):
+            raise serializers.ValidationError("Restore the card before editing.")
         if self.instance and board.pk != self.instance.board_id:
             raise serializers.ValidationError("Columns cannot change boards.")
         parent = data.get("parent", getattr(self.instance, "parent", None))
@@ -185,6 +211,18 @@ class LabelSerializer(serializers.ModelSerializer):
 
 
 class TaskSerializer(serializers.ModelSerializer):
+    participants = serializers.SerializerMethodField()
+    participant_ids = serializers.PrimaryKeyRelatedField(
+        source="participants",
+        queryset=get_user_model().objects.filter(is_active=True),
+        many=True,
+        write_only=True,
+        required=False,
+    )
+
+    def get_participants(self, obj):
+        return [user_data(u) for u in obj.participants.all()]
+
     cover = serializers.SerializerMethodField()
 
     def get_cover(self, obj):
@@ -220,6 +258,12 @@ class TaskSerializer(serializers.ModelSerializer):
                 "text": c.text,
                 "attachments": [],
             }
+        if cover.kind == "external_link" and cover.external_link:
+            result["external_link"] = {
+                "id": cover.external_link_id,
+                "title": cover.external_link.title,
+                "url": cover.external_link.url,
+            }
         return result
 
     assignee = serializers.SerializerMethodField()
@@ -248,6 +292,9 @@ class TaskSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "cover",
+            "is_archived",
+            "participants",
+            "participant_ids",
             "board",
             "column",
             "row",
@@ -295,6 +342,12 @@ class TaskSerializer(serializers.ModelSerializer):
             .exists()
         ):
             raise serializers.ValidationError("Board is inaccessible or archived.")
+        if (
+            self.instance
+            and self.instance.is_archived
+            and data.get("is_archived", True)
+        ):
+            raise serializers.ValidationError("Restore the card before editing.")
         if self.instance and board.pk != self.instance.board_id:
             raise serializers.ValidationError("Tasks cannot change boards.")
         if (
@@ -311,6 +364,11 @@ class TaskSerializer(serializers.ModelSerializer):
             )
         if any(label.board_id != board.pk for label in data.get("labels", [])):
             raise serializers.ValidationError("Labels must belong to the board.")
+        for participant in data.get("participants", []):
+            if not accessible_boards(participant).filter(pk=board.pk).exists():
+                raise serializers.ValidationError(
+                    "Participant must have access to the board."
+                )
         assignee = data.get("assignee")
         if assignee and not accessible_boards(assignee).filter(pk=board.pk).exists():
             raise serializers.ValidationError("Assignee must have access to the board.")
@@ -394,11 +452,64 @@ class BoardViewSet(BaseViewSet):
             TaskColumn.objects.bulk_update(columns, ["position"])
         return Response({"ids": ids})
 
+    @action(detail=False)
+    def people(self, request):
+        from django.conf import settings
+        from django.utils.module_loading import import_string
+
+        users = get_user_model().objects.filter(is_active=True)
+        custom = getattr(settings, "NADEIN_BOARD_USER_FILTER", None)
+        if custom:
+            users = import_string(custom)(request.user, users)
+        query = request.query_params.get("q", "").strip()
+        # Usernames work with both Django's stock User and custom user models.
+        users = users.filter(**{get_user_model().USERNAME_FIELD + "__icontains": query})
+        return Response([user_data(u) for u in users[:50]])
+
+    @action(detail=True, methods=["post"])
+    def pin(self, request, pk=None):
+        board = self.get_object()
+        value = request.data.get("is_pinned")
+        if type(value) is not bool:
+            raise ValidationError("is_pinned must be a boolean.")
+        BoardPreference.objects.update_or_create(
+            user=request.user, board=board, defaults={"is_pinned": value}
+        )
+        return Response(self.get_serializer(board).data)
+
+    @action(detail=True, methods=["post"], url_path="reorder-rows")
+    def reorder_rows(self, request, pk=None):
+        board = self.get_object()
+        require_owner(request.user, board)
+        column = get_object_or_404(
+            board.columns, pk=request.data.get("column"), parent=None
+        )
+        with transaction.atomic():
+            rows = list(column.rows.select_for_update())
+            ids = request.data.get("ids")
+            if (
+                not isinstance(ids, list)
+                or any(type(i) is not int for i in ids)
+                or len(ids) != len(set(ids))
+                or set(ids) != {r.pk for r in rows}
+            ):
+                raise ValidationError("Send all row IDs exactly once.")
+            for i, pk in enumerate(ids):
+                column.rows.filter(pk=pk).update(position=(i + 1) * 1000)
+        return Response({"ids": ids})
+
     @action(detail=True)
     def state(self, request, pk=None):
         board = self.get_object()
         tasks = board.tasks.select_related("assignee").prefetch_related(
-            "labels", "checklist_items", "comments", "attachments"
+            "labels",
+            "participants",
+            "checklist_items",
+            "comments",
+            "attachments",
+            "cover__attachment",
+            "cover__comment__author",
+            "cover__external_link",
         )
         users = get_user_model().objects.filter(is_active=True)
         if board.access_scope != "all":
@@ -412,7 +523,9 @@ class BoardViewSet(BaseViewSet):
                 "rows": RowSerializer(
                     TaskColumnRow.objects.filter(column__board=board), many=True
                 ).data,
-                "tasks": TaskSerializer(tasks, many=True).data,
+                "tasks": TaskSerializer(
+                    tasks, many=True, context={"request": request}
+                ).data,
                 "labels": LabelSerializer(board.labels.all(), many=True).data,
                 "users": [
                     user_data(u)
@@ -427,25 +540,26 @@ class BoardViewSet(BaseViewSet):
 
 
 class StructureViewSet(BaseViewSet):
+    def require_editable(self, board):
+        require_owner(self.request.user, board)
+        if board.is_archived:
+            raise ValidationError("Restore the board before editing its structure.")
+
     def perform_create(self, serializer):
         board = (
             serializer.validated_data.get("board")
             or serializer.validated_data["column"].board
         )
-        require_owner(self.request.user, board)
+        self.require_editable(board)
         serializer.save()
 
     def perform_update(self, serializer):
         obj = self.get_object()
-        require_owner(
-            self.request.user, obj.board if hasattr(obj, "board") else obj.column.board
-        )
+        self.require_editable(obj.board if hasattr(obj, "board") else obj.column.board)
         serializer.save()
 
     def perform_destroy(self, obj):
-        require_owner(
-            self.request.user, obj.board if hasattr(obj, "board") else obj.column.board
-        )
+        self.require_editable(obj.board if hasattr(obj, "board") else obj.column.board)
         obj.delete()
 
 
@@ -466,7 +580,9 @@ class ColumnViewSet(StructureViewSet):
     def perform_update(self, serializer):
         with transaction.atomic():
             super().perform_update(serializer)
-            for task in serializer.instance.tasks.all():
+            for task in Task.objects.filter(
+                Q(column=serializer.instance) | Q(column__parent=serializer.instance)
+            ):
                 task.save()
 
     def perform_destroy(self, obj):
@@ -496,15 +612,63 @@ class LabelViewSet(StructureViewSet):
 class TaskViewSet(BaseViewSet):
     serializer_class = TaskSerializer
 
+    def get_object(self):
+        obj = super().get_object()
+        if self.request.method not in ["GET", "HEAD", "OPTIONS"]:
+            if obj.board.is_archived:
+                raise ValidationError("Restore the board before editing.")
+            if obj.is_archived and self.action not in ["partial_update", "destroy"]:
+                raise ValidationError("Restore the card before editing.")
+        return obj
+
     def get_queryset(self):
         return (
             Task.objects.filter(board__in=accessible_boards(self.request.user))
             .select_related("board", "column", "assignee")
-            .prefetch_related("labels", "checklist_items", "comments", "attachments")
+            .prefetch_related(
+                "labels",
+                "participants",
+                "checklist_items",
+                "comments",
+                "attachments",
+                "cover__attachment",
+                "cover__comment__author",
+                "cover__external_link",
+            )
         )
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        with transaction.atomic():
+            column = serializer.validated_data["column"]
+            TaskColumn.objects.select_for_update().get(pk=column.pk)
+            position = (column.tasks.aggregate(v=Max("position"))["v"] or 0) + 1000
+            task = serializer.save(created_by=self.request.user, position=position)
+            record(task, self.request.user, "created")
+
+    def perform_update(self, serializer):
+        with transaction.atomic():
+            task = self.get_object()
+            previous = _task_snapshot(task)
+            old_column, old_row = task.column_id, task.row_id
+            updated = serializer.save()
+            current = _task_snapshot(updated)
+            record(
+                updated,
+                self.request.user,
+                "updated",
+                fields=[k for k in current if previous[k] != current[k]],
+                previous=previous,
+                current=current,
+                archived=updated.is_archived,
+            )
+            if old_column != updated.column_id or old_row != updated.row_id:
+                record(
+                    updated,
+                    self.request.user,
+                    "moved",
+                    from_column_id=old_column,
+                    to_column_id=updated.column_id,
+                )
 
     @action(detail=True, methods=["post"])
     def move(self, request, pk=None):
@@ -519,6 +683,7 @@ class TaskViewSet(BaseViewSet):
                 partial=True,
             )
             serializer.is_valid(raise_exception=True)
+            old_column = task.column_id
             task = serializer.save()
             # Lock the destination to serialize concurrent position changes on PostgreSQL.
             TaskColumn.objects.select_for_update().get(pk=task.column_id)
@@ -537,6 +702,13 @@ class TaskViewSet(BaseViewSet):
             for i, item in enumerate(siblings):
                 item.position = (i + 1) * 1000
             Task.objects.bulk_update(siblings, ["position"])
+            record(
+                task,
+                request.user,
+                "moved",
+                from_column_id=old_column,
+                to_column_id=task.column_id,
+            )
             task.refresh_from_db()
             return Response(self.get_serializer(task).data)
 
@@ -547,7 +719,12 @@ class TaskViewSet(BaseViewSet):
             TaskCover.objects.filter(task=task).delete()
         else:
             kind = request.data.get("kind")
-            values = {"kind": kind, "attachment": None, "comment": None}
+            values = {
+                "kind": kind,
+                "attachment": None,
+                "comment": None,
+                "external_link": None,
+            }
             if kind == "attachment":
                 values["attachment"] = get_object_or_404(
                     task.attachments, pk=request.data.get("id")
@@ -555,6 +732,10 @@ class TaskViewSet(BaseViewSet):
             elif kind == "comment":
                 values["comment"] = get_object_or_404(
                     task.comments, pk=request.data.get("id")
+                )
+            elif kind == "external_link":
+                values["external_link"] = get_object_or_404(
+                    task.external_links, pk=request.data.get("id")
                 )
             elif kind == "checklist":
                 if not task.checklist_items.exists():
@@ -564,13 +745,119 @@ class TaskViewSet(BaseViewSet):
             TaskCover.objects.update_or_create(task=task, defaults=values)
         return Response(self.get_serializer(self.get_queryset().get(pk=task.pk)).data)
 
+    @action(detail=True)
+    def history(self, request, pk=None):
+        task = self.get_object()
+        return Response(
+            [
+                {
+                    "id": a.pk,
+                    "action": a.action,
+                    "label": a.get_action_display(),
+                    "actor": user_data(a.actor) if a.actor else None,
+                    "metadata": {
+                        k: v for k, v in a.metadata.items() if not k.startswith("_")
+                    },
+                    "created_at": a.created_at,
+                }
+                for a in task.activities.select_related("actor")[:200]
+            ]
+        )
+
+    @action(detail=True, methods=["post"])
+    def duplicate(self, request, pk=None):
+        source = self.get_object()
+        with transaction.atomic():
+            task = Task.objects.create(
+                board=source.board,
+                column=source.column,
+                row=source.row,
+                title=(source.title + " — копия")[:255],
+                description=source.description,
+                priority=source.priority,
+                due_date=source.due_date,
+                assignee=source.assignee,
+                created_by=request.user,
+                position=(
+                    Task.objects.filter(column=source.column).aggregate(
+                        v=Max("position")
+                    )["v"]
+                    or 0
+                )
+                + 1000,
+            )
+            task.labels.set(source.labels.all())
+            task.participants.set(source.participants.all())
+            for item in source.checklist_items.all():
+                TaskChecklistItem.objects.create(
+                    task=task,
+                    title=item.title,
+                    position=item.position,
+                    created_by=request.user,
+                )
+            for link in source.external_links.all():
+                TaskExternalLink.objects.create(
+                    task=task, title=link.title, url=link.url, created_by=request.user
+                )
+            record(task, request.user, "created", copied_from=source.pk)
+        return Response(
+            self.get_serializer(self.get_queryset().get(pk=task.pk)).data, status=201
+        )
+
+    @action(detail=True, methods=["get", "post", "patch", "delete"])
+    def links(self, request, pk=None):
+        task = self.get_object()
+        if request.method in ["POST", "PATCH"]:
+            item = (
+                get_object_or_404(task.external_links, pk=request.data.get("id"))
+                if request.method == "PATCH"
+                else None
+            )
+            serializer = LinkSerializer(
+                item, data=request.data, partial=item is not None
+            )
+            serializer.is_valid(raise_exception=True)
+            url = serializer.validated_data.get("url", getattr(item, "url", ""))
+            if (
+                task.external_links.filter(url=url)
+                .exclude(pk=getattr(item, "pk", None))
+                .exists()
+            ):
+                raise ValidationError("This link is already attached.")
+            item = serializer.save(task=task, created_by=request.user)
+            record(task, request.user, "linked", title=item.title or item.url)
+        elif request.method == "DELETE":
+            item = get_object_or_404(task.external_links, pk=request.data.get("id"))
+            record(task, request.user, "unlinked", title=item.title or item.url)
+            item.delete()
+        return Response(LinkSerializer(task.external_links.all(), many=True).data)
+
+    @action(detail=True, methods=["post"], url_path="reorder-checklist")
+    def reorder_checklist(self, request, pk=None):
+        task = self.get_object()
+        with transaction.atomic():
+            items = list(task.checklist_items.select_for_update())
+            ids = request.data.get("ids")
+            if (
+                not isinstance(ids, list)
+                or any(type(i) is not int for i in ids)
+                or len(ids) != len(set(ids))
+                or set(ids) != {i.pk for i in items}
+            ):
+                raise ValidationError("Send all checklist IDs exactly once.")
+            for index, pk in enumerate(ids):
+                task.checklist_items.filter(pk=pk).update(position=(index + 1) * 1000)
+            record(task, request.user, "checklist_item_updated", reordered=True)
+        return Response({"ids": ids})
+
     @action(detail=True, methods=["get", "post", "patch", "delete"])
     def checklist(self, request, pk=None):
         task = self.get_object()
         if request.method == "POST":
             s = ChecklistSerializer(data=request.data)
             s.is_valid(raise_exception=True)
-            s.save(task=task, created_by=request.user)
+            item = s.save(task=task, created_by=request.user)
+            record(task, request.user, "checklist_item_added", title=item.title)
         elif request.method in ["PATCH", "DELETE"]:
             item = get_object_or_404(task.checklist_items, pk=request.data.get("id"))
             if request.method == "DELETE":
@@ -583,21 +870,43 @@ class TaskViewSet(BaseViewSet):
                     completed_by=request.user if completed else None,
                     completed_at=timezone.now() if completed else None,
                 )
+        if request.method in ["PATCH", "DELETE"]:
+            record(
+                task,
+                request.user,
+                "checklist_item_removed"
+                if request.method == "DELETE"
+                else "checklist_item_completed"
+                if item.is_completed
+                else "checklist_item_updated",
+                title=item.title,
+            )
         task._prefetched_objects_cache = {}
         return Response(ChecklistSerializer(task.checklist_items.all(), many=True).data)
 
-    @action(detail=True, methods=["get", "post", "delete"])
+    @action(detail=True, methods=["get", "post", "patch", "delete"])
     def comments(self, request, pk=None):
         task = self.get_object()
         if request.method == "POST":
             s = CommentSerializer(data=request.data)
             s.is_valid(raise_exception=True)
             s.save(task=task, author=request.user)
-        elif request.method == "DELETE":
+            record(task, request.user, "comment_added")
+        elif request.method in ["PATCH", "DELETE"]:
             item = get_object_or_404(task.comments, pk=request.data.get("id"))
             if item.author_id != request.user.pk:
                 require_owner(request.user, task.board)
-            item.delete()
+            if request.method == "DELETE":
+                item.delete()
+            else:
+                s = CommentSerializer(item, data=request.data, partial=True)
+                s.is_valid(raise_exception=True)
+                s.save()
+            record(
+                task,
+                request.user,
+                "comment_removed" if request.method == "DELETE" else "comment_edited",
+            )
         task._prefetched_objects_cache = {}
         return Response(
             CommentSerializer(task.comments.select_related("author"), many=True).data
@@ -614,7 +923,7 @@ class TaskViewSet(BaseViewSet):
                 settings, "NADEIN_BOARD_MAX_UPLOAD_BYTES", 10 * 1024 * 1024
             ):
                 raise ValidationError("Select a file within the upload size limit.")
-            TaskAttachment.objects.create(
+            attachment = TaskAttachment.objects.create(
                 task=task,
                 file=file,
                 file_name=file.name[:255],
@@ -622,8 +931,10 @@ class TaskViewSet(BaseViewSet):
                 mime_type=file.content_type or "",
                 uploaded_by=request.user,
             )
+            record(task, request.user, "attachment_added", title=attachment.file_name)
         elif request.method == "DELETE":
             item = get_object_or_404(task.attachments, pk=request.data.get("id"))
+            record(task, request.user, "attachment_removed", title=item.file_name)
             item.file.delete(save=False)
             item.delete()
         task._prefetched_objects_cache = {}
@@ -665,3 +976,46 @@ class CommentSerializer(serializers.ModelSerializer):
 
     def get_author(self, obj):
         return user_data(obj.author)
+
+
+class LinkSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TaskExternalLink
+        fields = ["id", "title", "url", "created_at"]
+
+    def validate_url(self, value):
+        if not value.startswith(("https://", "http://")):
+            raise serializers.ValidationError("Use an HTTP or HTTPS link.")
+        return value
+
+
+class GroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BoardGroup
+        fields = ["id", "name", "color", "boards", "position"]
+
+    def validate_boards(self, boards):
+        visible = set(
+            accessible_boards(self.context["request"].user).values_list("id", flat=True)
+        )
+        if any(b.pk not in visible for b in boards):
+            raise serializers.ValidationError("Choose accessible boards.")
+        return boards
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        visible = set(
+            accessible_boards(self.context["request"].user).values_list("id", flat=True)
+        )
+        data["boards"] = [pk for pk in data["boards"] if pk in visible]
+        return data
+
+
+class GroupViewSet(BaseViewSet):
+    serializer_class = GroupSerializer
+
+    def get_queryset(self):
+        return BoardGroup.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)

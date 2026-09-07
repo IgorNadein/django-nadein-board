@@ -20,6 +20,10 @@ export type TaskColumnRow = {
 };
 export type Label = { id: number; board: number; name: string; color: string };
 export type TaskCard = {
+  is_archived: boolean;
+  participants: User[];
+  created_at: string;
+  updated_at: string;
   cover?: TaskCover | null;
   id: number;
   board: number;
@@ -41,6 +45,10 @@ export type TaskCard = {
   linked_messages_count?: number;
 };
 export type Board = {
+  created_at: string;
+  updated_at: string;
+  is_pinned: boolean;
+  can_manage: boolean;
   avatar?: string | null;
   id: number;
   name: string;
@@ -100,4 +108,124 @@ export type TaskCover = {
     kind_display: string;
     description: string;
   } | null;
+};
+
+export type TaskAutomationKind = "event" | "schedule" | "button";
+export type TaskAutomationTrigger =
+  | "manual"
+  | "task_created"
+  | "task_updated"
+  | "task_moved"
+  | "label_added"
+  | "label_removed"
+  | "assignee_changed"
+  | "due_date_changed"
+  | "priority_changed"
+  | "attachment_added"
+  | "comment_added"
+  | "checklist_completed"
+  | "linked_object_added"
+  | "date_reached";
+
+export type TaskAutomationCondition =
+  | {
+      operator: "and" | "or" | "not";
+      children: TaskAutomationCondition[];
+    }
+  | {
+      field: string;
+      operator: string;
+      value?: unknown;
+    };
+
+export interface TaskAutomationAction {
+  type: string;
+  target?: "column" | "column_name" | "first" | "final";
+  column_id?: number;
+  column_name?: string;
+  user_id?: number | null;
+  label_id?: number;
+  priority?: TaskPriority;
+  mode?: "clear" | "fixed" | "relative";
+  date?: string;
+  days?: number;
+  text?: string;
+  items?: string[];
+}
+
+export interface TaskAutomation {
+  id: number;
+  name: string;
+  description?: string;
+  kind: TaskAutomationKind;
+  trigger: TaskAutomationTrigger;
+  conditions: TaskAutomationCondition;
+  actions: TaskAutomationAction[];
+  schedule_config: {
+    mode?: "task_due_date" | "fixed_datetime";
+    days_before?: number;
+    time?: string;
+    at?: string;
+  };
+  applies_to_all_boards: boolean;
+  boards: number[];
+  is_active: boolean;
+  stop_on_error: boolean;
+  position: number;
+  created_by?: User;
+  last_run_at?: string | null;
+  runs_count?: number;
+  can_manage?: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TaskAutomationRun {
+  id: number;
+  automation: number;
+  automation_name: string;
+  task: number;
+  task_title: string;
+  actor?: User | null;
+  source: "event" | "schedule" | "manual";
+  status: "running" | "success" | "partial" | "failed" | "skipped";
+  context: Record<string, unknown>;
+  actions_log: Array<Record<string, unknown>>;
+  error?: string;
+  started_at: string;
+  finished_at?: string | null;
+}
+
+export interface TaskAutomationCatalog {
+  kinds: Record<TaskAutomationKind, string>;
+  event_triggers: Record<string, string>;
+  condition_fields: Record<string, string>;
+  condition_operators: Record<string, string>;
+  action_types: Record<string, string>;
+  priorities: Record<TaskPriority, string>;
+}
+
+export type Api = <T>(
+  path: string,
+  method?: string,
+  data?: unknown,
+) => Promise<T>;
+export type TaskBoard = Board & { columns: TaskColumn[] };
+export type TaskBoardSummary = Board;
+export type TaskLabel = Label;
+export type Group = {
+  id: number;
+  name: string;
+  color: string;
+  boards: number[];
+  position: number;
+};
+export type ExternalLink = { id: number; title: string; url: string };
+export type Activity = {
+  id: number;
+  action: string;
+  label: string;
+  actor: User | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
 };

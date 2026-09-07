@@ -4,7 +4,7 @@ Language: **English** | [Русский](README.ru.md) | [Deutsch](README.de.md)
 
 Reusable Django task boards with a bundled React interface, extracted from EUSRR. Install the Python package, include its URLs, and open the board in an authenticated Django session. No Next.js server, Redis, Celery, messenger, or notification package is required.
 
-**Version 0.1.0 is an initial core extraction, not full EUSRR feature parity.**
+**Version 0.2.0 expands the standalone workspace with navigation, task details and the original automation editor/engine.**
 
 ## Included
 
@@ -12,14 +12,19 @@ Reusable Django task boards with a bundled React interface, extracted from EUSRR
 - Columns, subcolumns and lanes; cards with priorities, deadlines, assignees and board-scoped labels.
 - Middle-mouse panning, mobile lane scrolling, collapsible columns/lanes and wide mode.
 - Inline quick creation with urgency selection, draggable column ordering and cropped board avatars.
-- Card covers from an attachment, checklist or comment.
+- Card covers from an attachment, checklist, comment or external link.
+- Personal board groups, drag-to-group, favourites, search, sorting, board/card archive and restore.
+- Full task editor with participants, editable comments/checklists, links and activity history.
+- Card duplication (fields, members, labels, links and reset checklist), exact card/row/checklist ordering.
+- Combined filters for assignee, priority, labels, due date and completion.
+- Event automations, manual buttons, scheduled rules, conditions, action sequences and run logs.
 - Drag cards between cells; moving a card through the editor also works without a pointer.
 - Completion/reopening, checklists, independent comments, protected file upload/download.
 - Original EUSRR card presentation and board-layout logic, adapted to a standalone React shell.
 - Session authentication, CSRF protection, `AUTH_USER_MODEL`, access-filter extension point.
 - Built frontend assets inside the Python distribution. Node is only needed to change the frontend.
 
-Cards retain EUSRR's priority-first display order, then position. Dragging between columns/lanes is supported; precise card reordering is available through the move API. Board archiving and other API-only operations are documented in [integration](docs/integration.md).
+Cards retain EUSRR's priority-first display order, then position. Drop onto a card to insert before it within its priority group, or onto a cell to append. The workspace refreshes every 20 seconds while idle; polling pauses while a dialog is open so unsaved edits are preserved. Event rules and buttons work without a worker; scheduled rules require a periodic `python manage.py run_board_automations` invocation. See [integration](docs/integration.md).
 
 ## Local demo
 
@@ -31,6 +36,7 @@ source .venv/bin/activate
 python -m pip install -e .
 python manage.py migrate
 python manage.py seed_board_demo
+python manage.py seed_board_showcase
 python manage.py runserver 127.0.0.1:8765
 ```
 
@@ -78,6 +84,6 @@ A frontend rebuild updates the assets under `src/nadein_board/static/nadein_boar
 
 ## Extraction boundaries
 
-See [extraction notes](docs/extraction.md) for retained source, changed integration points and features not ported in 0.1.0. This version does not yet include EUSRR automation rules, board groups/pins, live multi-user updates, task activity history or corporate linked objects. UI text is currently Russian; documentation is available in four languages.
+See [extraction notes](docs/extraction.md) for retained source and boundaries. Corporate linked objects, messenger integration, employee skills/rewards, unread counters and WebSocket push belong to host integrations and are not bundled. UI text is currently Russian; documentation is available in four languages.
 
 No license has been selected for the extracted source yet. Public visibility does not itself grant an open-source license.

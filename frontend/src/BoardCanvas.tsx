@@ -16,8 +16,17 @@ import {
   horizontalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable";
-import { Maximize2, Minimize2 } from "lucide-react";
 import {
+  Maximize2,
+  Minimize2,
+  Copy,
+  Archive,
+  Pencil,
+  Trash2,
+  Check,
+} from "lucide-react";
+import {
+  TaskAnchoredMenuPopover,
   BoardColumn,
   BoardColumnGroup,
   BoardSubcolumnHeader,
@@ -37,7 +46,7 @@ type Props = {
   api: <T>(path: string, method?: string, data?: unknown) => Promise<T>;
   run: (fn: () => Promise<void>) => Promise<void>;
   reload: () => Promise<void>;
-  open: (t: TaskCard) => void;
+  open: (t: TaskCard, tab?: string) => void;
   dialog: (d: { kind: string; data?: Record<string, unknown> }) => void;
 };
 export default function BoardCanvas({
@@ -60,6 +69,31 @@ export default function BoardCanvas({
     [priority, setPriority] = useState<TaskPriority>("medium"),
     [activeTask, setActiveTask] = useState<TaskCard | null>(null),
     [activeColumn, setActiveColumn] = useState<number | null>(null);
+  const [taskMenu, setTaskMenu] = useState<number | null>(null);
+  const taskMenuAnchor = useRef<HTMLButtonElement | null>(null),
+    taskMenuRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const close = (e: PointerEvent) => {
+      if (
+        !taskMenuRef.current?.contains(e.target as Node) &&
+        !taskMenuAnchor.current?.contains(e.target as Node)
+      )
+        setTaskMenu(null);
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setTaskMenu(null);
+        setWide(false);
+      }
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", key);
+    };
+  }, []);
+  const menuTask = state.tasks.find((t) => t.id === taskMenu);
   const menuRef = useRef<HTMLDivElement | null>(null),
     nodes = useRef(new Map<number, HTMLElement>());
   const {
@@ -185,15 +219,18 @@ export default function BoardCanvas({
     completingTaskId: null,
     onCompleteTask: (t: TaskCard) => {
       void run(async () => {
-        const done = layout.leafColumns.find((c) => c.is_done);
+        const done = layout.leafColumns.find(
+          (c) =>
+            c.is_done || state.columns.find((p) => p.id === c.parent)?.is_done,
+        );
         if (!done) throw new Error("Сначала отметьте финальную колонку.");
         await change(t, { column: done.id, row: null });
       });
     },
-    openMenuTaskId: null,
-    onToggleTaskMenu: (id: number) => {
-      const t = state.tasks.find((t) => t.id === id);
-      if (t) open(t);
+    openMenuTaskId: taskMenu,
+    onToggleTaskMenu: (id: number, anchor: HTMLButtonElement) => {
+      taskMenuAnchor.current = anchor;
+      setTaskMenu(taskMenu === id ? null : id);
     },
   };
   const sensors = useSensors(
@@ -218,7 +255,17 @@ export default function BoardCanvas({
       ),
     };
     const hits = pointerWithin(filtered);
-    return hits.length ? hits : closestCorners(filtered);
+    const cardHits = hits.filter(
+      (h) =>
+        String(h.id).startsWith("card-target-") &&
+        Number(String(h.id).replace("card-target-", "")) !==
+          args.active.data.current?.taskId,
+    );
+    return cardHits.length
+      ? cardHits
+      : hits.length
+        ? hits
+        : closestCorners(filtered);
   };
   function drop(e: DragEndEvent) {
     setActiveTask(null);
@@ -228,11 +275,12 @@ export default function BoardCanvas({
     if (type === "task") {
       const t = state.tasks.find((t) => t.id === e.active.data.current?.taskId),
         target = e.over.data.current;
-      if (t && target?.acceptsTasks)
+      if (t && target?.acceptsTasks && target.before !== t.id)
         void run(async () => {
           await api(`tasks/${t.id}/move/`, "POST", {
             column: target.columnId,
             row: target.rowId ?? null,
+            before: target.before ?? null,
           });
           await reload();
         });
@@ -296,6 +344,74 @@ export default function BoardCanvas({
           {wide ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
         </button>
       </div>
+      {menuTask && (
+        <TaskAnchoredMenuPopover
+          anchorRef={taskMenuAnchor}
+          menuRef={taskMenuRef}
+          menuWidth={215}
+          widthClassName="w-56"
+          zIndex={90}
+        >
+          <button
+            className="menu-action"
+            onClick={() => {
+              open(menuTask);
+              setTaskMenu(null);
+            }}
+          >
+            <Pencil size={15} />
+            Открыть карточку
+          </button>
+          <button
+            className="menu-action"
+            onClick={() =>
+              void run(async () => {
+                const copy = await api<TaskCard>(
+                  `tasks/${menuTask.id}/duplicate/`,
+                  "POST",
+                );
+                setTaskMenu(null);
+                await reload();
+                open(copy);
+              })
+            }
+          >
+            <Copy size={15} />
+            Создать копию
+          </button>
+          <button
+            className="menu-action"
+            onClick={() => {
+              cards.onCompleteTask(menuTask);
+              setTaskMenu(null);
+            }}
+          >
+            <Check size={15} />
+            Завершить
+          </button>
+          <button
+            className="menu-action"
+            onClick={() =>
+              void run(async () => {
+                await change(menuTask, { is_archived: true });
+                setTaskMenu(null);
+              })
+            }
+          >
+            <Archive size={15} />В архив
+          </button>
+          <button
+            className="menu-action danger"
+            onClick={() => {
+              setTaskMenu(null);
+              dialog({ kind: "delete-task", data: { id: menuTask.id } });
+            }}
+          >
+            <Trash2 size={15} />
+            Удалить
+          </button>
+        </TaskAnchoredMenuPopover>
+      )}
       <DndContext
         sensors={sensors}
         collisionDetection={collision}
@@ -504,6 +620,7 @@ export default function BoardCanvas({
           {activeTask && (
             <div style={{ width: 280, pointerEvents: "none" }}>
               <TaskCardView
+                isOverlay
                 task={activeTask}
                 onOpen={() => {}}
                 onEdit={() => {}}
@@ -521,7 +638,7 @@ export default function BoardCanvas({
       </DndContext>
       <div className="pan-hint">
         Зажмите колёсико мыши, чтобы перемещаться по доске · Заголовки колонок
-        можно перетаскивать
+        можно перетаскивать · Карточки сгруппированы по срочности
       </div>
     </div>
   );
