@@ -859,3 +859,10 @@ legend {
   background: #eaf3ff;
   color: #2563eb;
 }
+/* Shared surface primitives required by the extracted EUSRR menus. */
+.app-menu{background:var(--surface-elevated);border:1px solid var(--border-subtle);color:var(--foreground);box-shadow:0 12px 35px #1e293b22;max-width:calc(100dvw - 1rem)}
+.app-menu button{justify-content:flex-start}
+.nb-sidebar nav button .app-avatar-fallback{flex:0 0 30px}
+.nb-sidebar nav button .app-avatar-fallback span{flex:none}
+.app-selected{background:#eaf3ff;color:#2563eb}
+:root{--surface-muted:#f0f3f8;--danger-soft:#fff1f2}
