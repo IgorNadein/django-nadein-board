@@ -1,0 +1,2 @@
+# Count maintained source instead of the compiled frontend bundle in GitHub languages.
+src/nadein_board/static/nadein_board/* linguist-generated=true

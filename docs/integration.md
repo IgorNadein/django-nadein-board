@@ -4,7 +4,7 @@
 
 Django 5.2, Python 3.11+, Django REST Framework, Pillow, database, Django auth/contenttypes/sessions/staticfiles, session/auth/CSRF middleware, Django templates with `APP_DIRS=True`, a login view and `LOGIN_URL`. Frontend requests use same-origin cookies and an explicit CSRF token, including when `CSRF_COOKIE_HTTPONLY=True`.
 
-The package uses `settings.AUTH_USER_MODEL` and standard user methods (`get_username`, `get_full_name`, `is_active`, `is_superuser`). Reverse user relation names and database constraints are prefixed to avoid collisions with EUSRR's original tasks app. There are no imports from EUSRR.
+The package uses `settings.AUTH_USER_MODEL` and standard user methods (`get_username`, `get_full_name`, `is_active`, `is_superuser`). Reverse user relation names and database constraints are prefixed to avoid collisions with other host applications.
 
 ## Permissions
 
@@ -51,11 +51,11 @@ The bundle also exports `mountBoard(element, {apiBase, csrfToken})`, which retur
 
 ## Data migration
 
-The initial migration creates new tables. It does not migrate existing EUSRR task data or modify its schema. An EUSRR-to-package data migration needs explicit mappings for users, board memberships, labels and removed corporate links; no production database is touched by this repository.
+The initial migration creates the package tables. Importing tasks from another system requires explicit mappings for users, board memberships, columns and labels. The demo seeders create synthetic data and are restricted to DEBUG environments.
 
-## Original frontend interactions restored
+## Board interactions
 
-Middle-button drag pans the board in both axes. On mobile, columns/cells have independent scroll viewports. Column headers are draggable within their sibling group; column/row collapsing is stored per user/board in localStorage. The + button opens EUSRR's inline quick composer with urgency buttons. Column jump navigation and expanded view are included. Avatar uploads use the original cropper and are re-encoded on the server.
+Middle-button drag pans the board in both axes. On mobile, columns/cells have independent scroll viewports. Column headers are draggable within their sibling group; column/row collapsing is stored per user/board in localStorage. The + button opens the inline quick composer with urgency buttons. Column jump navigation and expanded view are included. Avatar uploads use the built-in cropper and are re-encoded on the server.
 
 POST `/boards/{id}/reorder-columns/` with `ids` and optional `parent` persists sibling order atomically. GET/POST/DELETE `/boards/{id}/avatar/` reads or replaces a protected avatar (multipart `file`). PUT `/tasks/{id}/cover/` with `kind` (`attachment`, `checklist`, `comment`, `external_link`) and source `id` where applicable selects a cover; DELETE removes it. Cover sources must belong to the same card.
 

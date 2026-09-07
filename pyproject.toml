@@ -16,3 +16,9 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 nadein_board = ["templates/nadein_board/*.html", "static/nadein_board/*"]
+
+[project.urls]
+Repository = "https://github.com/IgorNadein/django-nadein-board"
+Documentation = "https://github.com/IgorNadein/django-nadein-board/blob/main/docs/integration.md"
+Issues = "https://github.com/IgorNadein/django-nadein-board/issues"
+Changelog = "https://github.com/IgorNadein/django-nadein-board/releases"

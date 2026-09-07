@@ -12,7 +12,7 @@ from nadein_board.models import (
 
 
 class Command(BaseCommand):
-    help = "Create synthetic demo data (DEBUG only); never reads EUSRR data."
+    help = "Create synthetic demo data (DEBUG only)."
 
     def handle(self, *args, **options):
         if not settings.DEBUG:

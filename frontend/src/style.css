@@ -535,7 +535,7 @@ legend {
   color: #94a3b8;
 }
 
-/* Extracted board scrolling and sticky header styles from EUSRR. */
+/* Board scrolling and sticky headers. */
 .tasks-board-scroll,
 .tasks-column-scroll,
 .app-list-scroll {
@@ -816,7 +816,7 @@ legend {
   background: #eaf3ff;
   color: #2563eb;
 }
-/* Shared surface primitives required by the extracted EUSRR menus. */
+/* Shared menu surfaces. */
 .app-menu {
   background: var(--surface-elevated);
   border: 1px solid var(--border-subtle);
@@ -841,7 +841,7 @@ legend {
   --surface-muted: #f0f3f8;
   --danger-soft: #fff1f2;
 }
-/* Standalone workspace adaptations around the original EUSRR board components. */
+/* Workspace layout and responsive board components. */
 :root {
   --surface-elevated: #fff;
   --surface-muted: #f8fafc;

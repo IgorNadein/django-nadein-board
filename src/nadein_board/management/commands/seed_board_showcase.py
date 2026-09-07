@@ -1,4 +1,4 @@
-"""Synthetic, idempotent showcase for the standalone UI; never imports EUSRR data."""
+"""Synthetic, idempotent showcase for the standalone task-board UI."""
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -36,7 +36,7 @@ class Command(BaseCommand):
             raise CommandError("Run seed_board_demo first.")
         with transaction.atomic():
             board, created = TaskBoard.objects.get_or_create(
-                name="Механики EUSRR",
+                name="Возможности Django Nadein Board",
                 created_by=user,
                 defaults={
                     "description": "Подколонки, дорожки, обложки и автоматизации — самостоятельный Django-модуль."
@@ -108,7 +108,7 @@ class Command(BaseCommand):
             comment = TaskComment.objects.create(
                 task=intro,
                 author=user,
-                text="Доска работает без EUSRR, Next.js, Redis и корпоративных сервисов.",
+                text="Доска работает внутри Django: интерфейс входит в пакет, отдельный frontend-сервер не нужен.",
             )
             TaskCover.objects.create(task=intro, kind="comment", comment=comment)
             c = card(
