@@ -853,34 +853,56 @@ class TaskViewSet(BaseViewSet):
     @action(detail=True, methods=["get", "post", "patch", "delete"])
     def checklist(self, request, pk=None):
         task = self.get_object()
-        if request.method == "POST":
-            s = ChecklistSerializer(data=request.data)
-            s.is_valid(raise_exception=True)
-            item = s.save(task=task, created_by=request.user)
-            record(task, request.user, "checklist_item_added", title=item.title)
-        elif request.method in ["PATCH", "DELETE"]:
-            item = get_object_or_404(task.checklist_items, pk=request.data.get("id"))
-            if request.method == "DELETE":
-                item.delete()
-            else:
-                s = ChecklistSerializer(item, data=request.data, partial=True)
-                s.is_valid(raise_exception=True)
-                completed = s.validated_data.get("is_completed", item.is_completed)
-                s.save(
+        with transaction.atomic():
+            if request.method != "GET":
+                Task.objects.select_for_update().get(pk=task.pk)
+            if request.method == "POST":
+                serializer = ChecklistSerializer(data=request.data)
+                serializer.is_valid(raise_exception=True)
+                completed = serializer.validated_data.get("is_completed", False)
+                item = serializer.save(
+                    task=task,
+                    created_by=request.user,
                     completed_by=request.user if completed else None,
                     completed_at=timezone.now() if completed else None,
                 )
-        if request.method in ["PATCH", "DELETE"]:
-            record(
-                task,
-                request.user,
-                "checklist_item_removed"
-                if request.method == "DELETE"
-                else "checklist_item_completed"
-                if item.is_completed
-                else "checklist_item_updated",
-                title=item.title,
-            )
+                record(task, request.user, "checklist_item_added", title=item.title)
+            elif request.method in ["PATCH", "DELETE"]:
+                item = get_object_or_404(
+                    task.checklist_items.select_for_update(), pk=request.data.get("id")
+                )
+                if request.method == "DELETE":
+                    record(
+                        task, request.user, "checklist_item_removed", title=item.title
+                    )
+                    item.delete()
+                else:
+                    previous_completed, previous_title = item.is_completed, item.title
+                    serializer = ChecklistSerializer(
+                        item, data=request.data, partial=True
+                    )
+                    serializer.is_valid(raise_exception=True)
+                    completed = serializer.validated_data.get(
+                        "is_completed", previous_completed
+                    )
+                    changes = {}
+                    if completed != previous_completed:
+                        changes = {
+                            "completed_by": request.user if completed else None,
+                            "completed_at": timezone.now() if completed else None,
+                        }
+                    item = serializer.save(**changes)
+                    if completed != previous_completed or item.title != previous_title:
+                        record(
+                            task,
+                            request.user,
+                            "checklist_item_completed"
+                            if completed and not previous_completed
+                            else "checklist_item_reopened"
+                            if previous_completed and not completed
+                            else "checklist_item_updated",
+                            title=item.title,
+                        )
         task._prefetched_objects_cache = {}
         return Response(ChecklistSerializer(task.checklist_items.all(), many=True).data)
 

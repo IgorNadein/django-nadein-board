@@ -310,3 +310,36 @@ class ExtendedBoardTests(TestCase):
             "labels/", {"board": self.board.pk, "name": "No", "color": "#123456"}
         )
         self.assertEqual(response.status_code, 400)
+
+    def test_edit_completed_checklist_does_not_retrigger_completion_rule(self):
+        rule = self.rule(
+            trigger="checklist_completed",
+            actions=[{"type": "add_comment", "text": "Checklist transition"}],
+        )
+        item = TaskChecklistItem.objects.create(
+            task=self.task, title="Check", created_by=self.owner
+        )
+        path = self.base + f"tasks/{self.task.pk}/checklist/"
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.patch(
+                path, {"id": item.pk, "is_completed": True}, format="json"
+            )
+        item.refresh_from_db()
+        completed_at = item.completed_at
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.patch(path, {"id": item.pk, "title": "Renamed"}, format="json")
+            self.client.patch(
+                path, {"id": item.pk, "is_completed": True}, format="json"
+            )
+        item.refresh_from_db()
+        self.assertEqual(item.completed_at, completed_at)
+        self.assertEqual(rule.runs.count(), 1)
+        self.assertEqual(self.task.comments.count(), 1)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.patch(
+                path, {"id": item.pk, "is_completed": False}, format="json"
+            )
+            self.client.patch(
+                path, {"id": item.pk, "is_completed": True}, format="json"
+            )
+        self.assertEqual(rule.runs.count(), 2)
