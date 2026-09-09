@@ -1,18 +1,40 @@
-Language: [English](README.md) | [Русский](README.ru.md) | [Deutsch](README.de.md) | [Español](README.es.md)
+<p align="center"><a href="README.md">English</a> · <strong>Русский</strong> · <a href="README.de.md">Deutsch</a> · <a href="README.es.md">Español</a></p>
 
 # Django Nadein Board
 
+**Доски задач и автоматизация процессов внутри Django.**
+
+[![Checks](https://github.com/IgorNadein/django-nadein-board/actions/workflows/checks.yml/badge.svg)](https://github.com/IgorNadein/django-nadein-board/actions/workflows/checks.yml)
+![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
+![Django](https://img.shields.io/badge/Django-5.2-092E20?logo=django&logoColor=white)
+![Version](https://img.shields.io/badge/version-0.2.0-64748b)
+
+[Обзор интерфейса](docs/demo.md) · [Интеграция и API](docs/integration.md) · [Архитектура](docs/architecture.md) · [Задачи и ошибки](https://github.com/IgorNadein/django-nadein-board/issues)
+
 Самостоятельный пакет досок задач для Django со встроенным интерфейсом на React и TypeScript. Добавляет совместную работу с задачами и автоматизацию процессов в ваше Django-приложение, используя его пользователей и вход в систему.
 
-[![Проверки](https://github.com/IgorNadein/django-nadein-board/actions/workflows/checks.yml/badge.svg)](https://github.com/IgorNadein/django-nadein-board/actions/workflows/checks.yml)
+![Django Nadein Board — interface preview](docs/images/workspace.png)
 
-**Python 3.11+ · Django 5.2 · Django REST Framework · React · TypeScript**
+## Кратко о возможностях
 
-![Рабочее пространство: колонки, дорожки и обложки карточек](docs/images/workspace.png)
+| Раздел | Что входит |
+|---|---|
+| **Организация работы** | Колонки, подколонки, дорожки, срочность, метки и фильтры. |
+| **Работа с карточкой** | Обложки, чек-листы, комментарии, защищённые вложения и история. |
+| **Автоматизация** | События, кнопки, правила по срокам и журнал выполнения. |
+| **Подключение к Django** | Пользователи и сессии вашего проекта; собранный React-интерфейс в wheel. |
 
-[Демонстрация интерфейса](docs/demo.md) · [Интеграция и API](docs/integration.md) · [Архитектура](docs/architecture.md) · [Релизы](https://github.com/IgorNadein/django-nadein-board/releases)
+<details>
+<summary>Другие экраны</summary>
 
-## Возможности
+![Card editor](docs/images/card-editor.png)
+
+![Workflow automations](docs/images/automations.png)
+
+</details>
+
+<details>
+<summary>Все возможности и особенности поведения</summary>
 
 - Несколько досок, доступ создателю, выбранным участникам или всем авторизованным пользователям.
 - Колонки, подколонки, дорожки, перенос карточек, срочность, сроки, исполнители и метки.
@@ -27,11 +49,15 @@ Language: [English](README.md) | [Русский](README.ru.md) | [Deutsch](READ
 
 Next.js-сервер, Redis, Celery, мессенджер и модуль уведомлений не нужны. Собранный фронтенд входит в Python-пакет; Node нужен только для его изменения.
 
+</details>
+
 ## Запуск демонстрации
 
 Python 3.11 или новее:
 
 ```bash
+git clone https://github.com/IgorNadein/django-nadein-board.git
+cd django-nadein-board
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
@@ -40,7 +66,6 @@ python manage.py seed_board_demo
 python manage.py seed_board_showcase
 python manage.py runserver 127.0.0.1:8765
 ```
-
 
 Откройте http://127.0.0.1:8765/board/ — логин `demo`, пароль `demo-board-local`. Это локальные демонстрационные настройки. Все примеры используют искусственные данные.
 
@@ -63,3 +88,7 @@ python manage.py runserver 127.0.0.1:8765
 31 backend-тест и 6 frontend-тестов. GitHub Actions проверяет тесты, миграции, сборку интерфейса и Python-пакета. Установка собранного wheel также проверена в чистом Django-окружении с отдельной базой и URL-префиксом.
 
 `python manage.py test tests` — backend; `cd frontend && npm ci && npm run build && npm test` — сборка TypeScript и frontend-тесты.
+
+## Другой модуль
+
+[Django Nadein Notifications](https://github.com/IgorNadein/django-nadein-notifications) — Оба пакета работают независимо. Связь событий доски с уведомлениями настраивается в Django-проекте.

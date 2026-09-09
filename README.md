@@ -1,22 +1,40 @@
-Language: **English** | [Русский](README.ru.md) | [Deutsch](README.de.md) | [Español](README.es.md)
+<p align="center"><strong>English</strong> · <a href="README.ru.md">Русский</a> · <a href="README.de.md">Deutsch</a> · <a href="README.es.md">Español</a></p>
 
 # Django Nadein Board
 
-A standalone task-board package for Django, with a bundled React and TypeScript interface. Add collaborative boards and workflow automation to an existing Django application. Install the Python package, include its URLs, and open the board in an authenticated Django session. No Next.js server, Redis, Celery, messenger, or notification package is required.
+**Task boards and workflow automation inside Django.**
 
 [![Checks](https://github.com/IgorNadein/django-nadein-board/actions/workflows/checks.yml/badge.svg)](https://github.com/IgorNadein/django-nadein-board/actions/workflows/checks.yml)
+![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
+![Django](https://img.shields.io/badge/Django-5.2-092E20?logo=django&logoColor=white)
+![Version](https://img.shields.io/badge/version-0.2.0-64748b)
 
-**Python 3.11+ · Django 5.2 · Django REST Framework · React · TypeScript**
+[Interface tour](docs/demo.md) · [Integration & API](docs/integration.md) · [Architecture](docs/architecture.md) · [Issues](https://github.com/IgorNadein/django-nadein-board/issues)
 
-![Task-board workspace with columns, lanes and card covers](docs/images/workspace.png)
+A standalone task-board package for Django, with a bundled React and TypeScript interface. Add collaborative boards and workflow automation to an existing Django application. Install the Python package, include its URLs, and open the board in an authenticated Django session. No Next.js server, Redis, Celery, messenger, or notification package is required.
 
-[Interface tour](docs/demo.md) · [Integration & API](docs/integration.md) · [Architecture](docs/architecture.md) · [Releases](https://github.com/IgorNadein/django-nadein-board/releases)
+![Django Nadein Board — interface preview](docs/images/workspace.png)
 
-## Why this package
+## At a glance
 
-Bring task tracking into an internal tool, customer portal or Django application while keeping its existing users and login. Board permissions, private attachments and automation rules run in the same Django service. The compiled interface ships in the Python package; a separate frontend server is not required.
+| Area | What is included |
+|---|---|
+| **Organize work** | Columns, subcolumns, lanes, priorities, labels and filters. |
+| **Act on tasks** | Covers, checklists, comments, protected attachments and activity history. |
+| **Automate workflows** | Event rules, manual buttons, scheduled actions and execution logs. |
+| **Use existing Django** | Your users, sessions and permissions; compiled React UI in the wheel. |
 
-## Included
+<details>
+<summary>More interface views</summary>
+
+![Card editor](docs/images/card-editor.png)
+
+![Workflow automations](docs/images/automations.png)
+
+</details>
+
+<details>
+<summary>Full feature list and behavior</summary>
 
 - Multiple private, member-only, or all-authenticated-user boards.
 - Columns, subcolumns and lanes; cards with priorities, deadlines, assignees and board-scoped labels.
@@ -35,11 +53,15 @@ Bring task tracking into an internal tool, customer portal or Django application
 
 Cards are ordered by priority, then position. Drop onto a card to insert before it within its priority group, or onto a cell to append. The workspace refreshes every 20 seconds while idle; polling pauses while a dialog is open so unsaved edits are preserved. Event rules and buttons work without a worker; scheduled rules require a periodic `python manage.py run_board_automations` invocation. See [integration](docs/integration.md).
 
+</details>
+
 ## Local demo
 
 Python 3.11+:
 
 ```bash
+git clone https://github.com/IgorNadein/django-nadein-board.git
+cd django-nadein-board
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
@@ -98,3 +120,7 @@ See [architecture](docs/architecture.md) for the package structure, event proces
 The project includes 31 backend tests and 6 frontend tests. GitHub Actions runs tests, checks for missing migrations, builds the frontend and builds the Python distribution. Installation of the built wheel has also been checked in a clean Django environment with its own database and URL prefix.
 
 No license has been selected yet. Public visibility does not itself grant an open-source license.
+
+## Related package
+
+[Django Nadein Notifications](https://github.com/IgorNadein/django-nadein-notifications) — Both packages work independently. Connecting board events to notifications is an explicit host-application integration.
