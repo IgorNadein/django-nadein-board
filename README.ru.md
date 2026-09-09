@@ -7,7 +7,8 @@
 [![Checks](https://github.com/IgorNadein/django-nadein-board/actions/workflows/checks.yml/badge.svg)](https://github.com/IgorNadein/django-nadein-board/actions/workflows/checks.yml)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![Django](https://img.shields.io/badge/Django-5.2-092E20?logo=django&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.2.0-64748b)
+![Version](https://img.shields.io/badge/version-0.2.1-64748b)
+[![MIT](https://img.shields.io/badge/license-MIT-22c55e)](LICENSE)
 
 [Обзор интерфейса](docs/demo.md) · [Интеграция и API](docs/integration.md) · [Архитектура](docs/architecture.md) · [Задачи и ошибки](https://github.com/IgorNadein/django-nadein-board/issues)
 
@@ -81,7 +82,7 @@ python manage.py runserver 127.0.0.1:8765
 
 Событийные правила и кнопки работают сразу. Для правил по срокам планировщик должен периодически запускать `python manage.py run_board_automations`. Рабочее пространство обновляется каждые 20 секунд в покое; при открытом редакторе опрос приостановлен.
 
-[Устройство пакета и границы интеграции](docs/architecture.md). Лицензия пока не выбрана.
+[Устройство пакета и границы интеграции](docs/architecture.md). Лицензия — [MIT](LICENSE).
 
 ## Проверки
 

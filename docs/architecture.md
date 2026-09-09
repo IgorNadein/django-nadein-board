@@ -40,7 +40,7 @@ The default dispatcher is synchronous and is not a durable job queue. Hosts with
 - Cross-board card transfer is not implemented. Column archival is currently API-only.
 - Notifications, unread counters and WebSocket push are host integrations.
 - UI text is Russian. Documentation is available in English, Russian, German and Spanish.
-- The package has not been published on PyPI. No license has been selected yet.
+- The package has not been published on PyPI. Licensed under [MIT](../LICENSE).
 
 ## Verification
 

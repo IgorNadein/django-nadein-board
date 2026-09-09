@@ -7,7 +7,8 @@
 [![Checks](https://github.com/IgorNadein/django-nadein-board/actions/workflows/checks.yml/badge.svg)](https://github.com/IgorNadein/django-nadein-board/actions/workflows/checks.yml)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![Django](https://img.shields.io/badge/Django-5.2-092E20?logo=django&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.2.0-64748b)
+![Version](https://img.shields.io/badge/version-0.2.1-64748b)
+[![MIT](https://img.shields.io/badge/license-MIT-22c55e)](LICENSE)
 
 [Interface tour](docs/demo.md) · [Integration & API](docs/integration.md) · [Architecture](docs/architecture.md) · [Issues](https://github.com/IgorNadein/django-nadein-board/issues)
 
@@ -119,7 +120,7 @@ See [architecture](docs/architecture.md) for the package structure, event proces
 
 The project includes 31 backend tests and 6 frontend tests. GitHub Actions runs tests, checks for missing migrations, builds the frontend and builds the Python distribution. Installation of the built wheel has also been checked in a clean Django environment with its own database and URL prefix.
 
-No license has been selected yet. Public visibility does not itself grant an open-source license.
+Licensed under the [MIT license](LICENSE).
 
 ## Related package
 

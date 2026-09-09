@@ -7,7 +7,8 @@
 [![Checks](https://github.com/IgorNadein/django-nadein-board/actions/workflows/checks.yml/badge.svg)](https://github.com/IgorNadein/django-nadein-board/actions/workflows/checks.yml)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![Django](https://img.shields.io/badge/Django-5.2-092E20?logo=django&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.2.0-64748b)
+![Version](https://img.shields.io/badge/version-0.2.1-64748b)
+[![MIT](https://img.shields.io/badge/license-MIT-22c55e)](LICENSE)
 
 [Ver la interfaz](docs/demo.md) · [Integración y API](docs/integration.md) · [Arquitectura](docs/architecture.md) · [Incidencias](https://github.com/IgorNadein/django-nadein-board/issues)
 
@@ -53,7 +54,7 @@ python manage.py runserver 127.0.0.1:8765
 
 Demo: http://127.0.0.1:8765/board/ — `demo` / `demo-board-local`.
 
-La interfaz está en ruso. Todavía no se ha elegido una licencia ni se ha publicado el paquete en PyPI. GitHub Actions ejecuta 31 pruebas de backend y 6 de frontend, comprueba las migraciones y compila la interfaz y el paquete.
+La interfaz está en ruso. Licencia [MIT](LICENSE). El paquete aún no está publicado en PyPI. GitHub Actions ejecuta 31 pruebas de backend y 6 de frontend, comprueba las migraciones y compila la interfaz y el paquete.
 
 ## Otro módulo
 
